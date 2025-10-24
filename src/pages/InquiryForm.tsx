@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
+import StepIndicator from "@/components/StepIndicator";
 import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { servicesData, getFormQuestions } from "@/data/servicesData";
@@ -61,7 +61,6 @@ const InquiryForm = () => {
   );
 
   const totalSteps = questions.length + 1; // +1 for contact info
-  const progress = ((currentStep + 1) / totalSteps) * 100;
 
   if (!service || !category) {
     return (
@@ -277,17 +276,9 @@ const InquiryForm = () => {
 
       <div className="pt-24 pb-20 px-4">
         <div className="container mx-auto max-w-3xl">
-          {/* Progress Bar */}
+          {/* Step Indicator */}
           <div className="mb-8 animate-fade-in">
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-sm font-medium">
-                Step {currentStep + 1} of {totalSteps}
-              </span>
-              <span className="text-sm text-primary font-semibold">
-                {Math.round(progress)}% Complete
-              </span>
-            </div>
-            {/* <Progress value={progress} className="h-2.5 transition-all duration-500" /> */}
+            <StepIndicator totalSteps={totalSteps} currentStep={currentStep} />
           </div>
 
           {/* Form Card */}
