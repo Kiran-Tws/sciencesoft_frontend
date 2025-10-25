@@ -10,6 +10,8 @@ import InquiryForm from "./pages/InquiryForm";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
+import InquiryList from './pages/InquiryList';
+import InquiryDetail from "./pages/InquiryDetail";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +23,8 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/admin/inquiries" element={<InquiryList />} />
+          <Route path="/admin/inquiries/:sessionId" element={<InquiryDetail />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/category/:categoryId" element={<CategoryDetail />} />
           {/* <Route path="/inquiry/:categoryId" element={<InquiryForm />} /> */}
