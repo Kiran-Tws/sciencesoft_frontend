@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,210 +17,223 @@ import { Checkbox } from "@/components/ui/checkbox";
 import StepIndicator from "@/components/StepIndicator";
 import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { servicesData, getFormQuestions } from "@/data/servicesData";
 import { toast } from "sonner";
 import { z } from "zod";
+import axios from "axios";
 
-// Contact form validation schema
+const apiUrl = import.meta.env.VITE_BASE_API_URL;
+
 const contactSchema = z.object({
   name: z
     .string()
     .trim()
     .min(2, { message: "Name must be at least 2 characters" })
     .max(100, { message: "Name must be less than 100 characters" }),
-  email: z
+  work_email: z
     .string()
     .trim()
     .email({ message: "Please enter a valid email address" })
     .max(255, { message: "Email must be less than 255 characters" }),
-  phone: z
+  phone_number: z
     .string()
     .trim()
     .min(10, { message: "Please enter a valid phone number" })
     .max(20, { message: "Phone number is too long" }),
-  company: z.string().trim().max(100).optional(),
-  additional: z.string().trim().max(1000).optional(),
+  company_name: z.string().trim().max(100).optional(),
+  preferred_communication: z.string().optional(),
 });
 
 const InquiryForm = () => {
-  const { serviceId, categoryId, subcategoryId } = useParams();
+  const { subcategoryId } = useParams();
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState<Record<string, any>>({});
+
+  const [formSteps, setFormSteps] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [formData, setFormData] = useState({});
   const [submitted, setSubmitted] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const service = servicesData.find((s) => s.id === serviceId);
-  const category = service?.categories.find((c) => c.id === categoryId);
-  const subcategory = category?.subcategories?.find((sc) => sc.id === subcategoryId);
-
-  const questions = getFormQuestions(
-    serviceId || "",
-    categoryId || "",
-    subcategoryId
+  const [sessionId, setSessionId] = useState(
+    localStorage.getItem("formSessionId") || null
   );
 
-  const totalSteps = questions.length + 1; // +1 for contact info
+  // Contact form data state separate from steps formData
+  const [contactData, setContactData] = useState({
+    name: "",
+    company_name: "",
+    work_email: "",
+    phone_number: "",
+    preferred_communication: "",
+  });
 
-  if (!service || !category) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Service not found</h1>
-          <Button onClick={() => navigate("/pricing")}>Back to Services</Button>
-        </div>
-      </div>
-    );
-  }
+  const phoneRegex = /^\+?[\d\s\-().]{7,20}$/;
 
-  const handleAnswerChange = (questionId: string, value: any) => {
+  const [phoneError, setPhoneError] = useState("");
+
+  const handlePhoneChange = (value) => {
+    // Allow empty string or only digits
+    if (value === "" || /^\d+$/.test(value)) {
+      handleContactChange("phone_number", value);
+      setPhoneError("");
+    } else {
+      setPhoneError("Please enter only numbers");
+    }
+  };
+
+  console.log("subcategoryId->>", subcategoryId);
+  useEffect(() => {
+    const fetchFormSteps = async () => {
+      if (!subcategoryId) return;
+      console.log("subcategoryId->>", subcategoryId);
+
+      try {
+        setLoading(true);
+        const response2 = await axios.get(
+          `${apiUrl}/api/fetch_formsData/${subcategoryId}`
+        );
+
+        setFormSteps(response2.data);
+        setLoading(false);
+      } catch (error) {
+        console.error("Failed to fetch form steps", error);
+        setError("Failed to load form data.");
+        setLoading(false);
+      }
+    };
+    fetchFormSteps();
+  }, [subcategoryId]);
+
+  const totalSteps = formSteps.length + 1; // +1 for contact form
+  const currentStep =
+    currentStepIndex < formSteps.length ? formSteps[currentStepIndex] : null;
+  const isContactStep = currentStepIndex === formSteps.length;
+
+  // Handle answer changes for questions
+  const handleAnswerChange = (questionId, value) => {
     setFormData((prev) => ({ ...prev, [questionId]: value }));
   };
 
-  const handleNext = () => {
-    const currentQuestion = questions[currentStep];
-    
-    if (currentStep < questions.length) {
-      if (currentQuestion?.required && !formData[currentQuestion.id]) {
-        toast.error("Please answer this question before proceeding");
-        return;
+  // Handle contact form field changes
+  const handleContactChange = (field, value) => {
+    setContactData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Validate required questions for current step
+  const validateStep = () => {
+    if (!currentStep || !currentStep.questions) return true;
+    for (const q of currentStep.questions) {
+      if (
+        q.is_required &&
+        (formData[q.id] === undefined || formData[q.id] === "")
+      ) {
+        toast.error(
+          `Please answer the required question: "${q.question_text}"`
+        );
+        return false;
       }
     }
+    return true;
+  };
 
-    if (currentStep < totalSteps - 1) {
-      setCurrentStep(currentStep + 1);
+  const submitCurrentStep = async () => {
+    if (!validateStep()) return;
+
+    try {
+      const stepId = currentStep.id;
+      const stepOrder = currentStep.step_order;
+
+      // Build payload in expected format for API
+      const payload = Object.entries(formData)
+        .map(([question_id, answer]) => {
+          if (Array.isArray(answer)) {
+            // Multiple choice answers, send individual responses
+            return answer.map((ans) => ({
+              question_id,
+              selected_option_id: ans, // Assumes answer is option id
+              response_value: null,
+            }));
+          }
+          // Single answer
+          return {
+            question_id,
+            selected_option_id: answer, // or set null if text input? Adjust as needed
+            response_value: typeof answer === "string" ? answer : null,
+          };
+        })
+        .flat();
+
+      const headers = sessionId ? { "x-session-id": sessionId } : {};
+
+      const response = await axios.post(
+        `${apiUrl}/api/user_responses/${stepId}`,
+        payload,
+        { headers }
+      );
+
+      if (stepOrder === 1 && response.data.sessionId) {
+        localStorage.setItem("formSessionId", response.data.sessionId);
+        setSessionId(response.data.sessionId);
+      }
+
+      setFormData({});
+      setCurrentStepIndex((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error submitting form step:", error);
+      toast.error("Failed to submit step, please try again.");
     }
   };
 
   const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+    if (currentStepIndex > 0) {
+      setCurrentStepIndex((prev) => prev - 1);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e) => {
     e.preventDefault();
-    setErrors({});
-    
-    // Validate contact info using zod schema
-    try {
-      contactSchema.parse({
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        company: formData.company,
-        additional: formData.additional,
-      });
 
-      // Here you would typically send the data to your backend
-      // Note: Never log sensitive user data in production
-      setSubmitted(true);
-      toast.success("Your inquiry has been submitted successfully!");
+    try {
+      contactSchema.parse(contactData);
+
+      const contactDataResponse = await axios.post(
+        `${apiUrl}/api/final-contacts/${sessionId}`,
+        contactData
+      );
+
+      if (contactDataResponse.status === 201) {
+        localStorage.removeItem("formSessionId");
+        setSubmitted(true);
+      } else {
+        // If backend responds with other than 201, show message if any
+        const msg =
+          contactDataResponse.data?.message ||
+          "Unexpected response from server. Please try again.";
+        toast.error(msg);
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const fieldErrors: Record<string, string> = {};
         error.errors.forEach((err) => {
-          if (err.path[0]) {
-            fieldErrors[err.path[0] as string] = err.message;
-          }
+          toast.error(err.message);
         });
-        setErrors(fieldErrors);
-        toast.error("Please fix the errors in the form");
+      } else if (axios.isAxiosError(error)) {
+        // Axios error - try to extract backend error message
+        const backendMessage =
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          "Failed to submit contact info, please try again.";
+        toast.error(backendMessage);
+      } else {
+        console.error("Error submitting contact info:", error);
+        toast.error("Failed to submit contact info, please try again.");
       }
     }
   };
 
-  const renderQuestion = (question: any) => {
-    switch (question.type) {
-      case "mcq":
-        return (
-          <div className="space-y-3">
-            {question.options?.map((option: string, index: number) => (
-              <div key={index} className="flex items-center space-x-3">
-                <Checkbox
-                  id={`${question.id}-${index}`}
-                  checked={
-                    Array.isArray(formData[question.id]) &&
-                    formData[question.id].includes(option)
-                  }
-                  onCheckedChange={(checked) => {
-                    const current = formData[question.id] || [];
-                    if (checked) {
-                      handleAnswerChange(question.id, [...current, option]);
-                    } else {
-                      handleAnswerChange(
-                        question.id,
-                        current.filter((o: string) => o !== option)
-                      );
-                    }
-                  }}
-                />
-                <Label
-                  htmlFor={`${question.id}-${index}`}
-                  className="cursor-pointer text-base"
-                >
-                  {option}
-                </Label>
-              </div>
-            ))}
-          </div>
-        );
+  if (loading) return <p>Loading form...</p>;
+  if (error) return <p className="text-red-600">{error}</p>;
 
-      case "radio":
-        return (
-          <RadioGroup
-            value={formData[question.id]}
-            onValueChange={(value) => handleAnswerChange(question.id, value)}
-          >
-            {question.options?.map((option: string, index: number) => (
-              <div key={index} className="flex items-center space-x-3">
-                <RadioGroupItem value={option} id={`${question.id}-${index}`} />
-                <Label
-                  htmlFor={`${question.id}-${index}`}
-                  className="cursor-pointer text-base"
-                >
-                  {option}
-                </Label>
-              </div>
-            ))}
-          </RadioGroup>
-        );
-
-      case "select":
-        return (
-          <Select
-            value={formData[question.id]}
-            onValueChange={(value) => handleAnswerChange(question.id, value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select an option" />
-            </SelectTrigger>
-            <SelectContent>
-              {question.options?.map((option: string, index: number) => (
-                <SelectItem key={index} value={option}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        );
-
-      case "text":
-        return (
-          <Textarea
-            value={formData[question.id] || ""}
-            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-            placeholder="Type your answer here..."
-            rows={4}
-          />
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  if (submitted) {
+  if (submitted)
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -233,27 +246,19 @@ const InquiryForm = () => {
                     <CheckCircle2 className="h-16 w-16 text-primary" />
                   </div>
                 </div>
-                <h1 className="text-3xl font-bold mb-4 animate-fade-in" style={{ animationDelay: "100ms" }}>
+                <h1
+                  className="text-3xl font-bold mb-4 animate-fade-in"
+                  style={{ animationDelay: "100ms" }}
+                >
                   Thank You for Your Inquiry!
                 </h1>
-                <p className="text-lg text-muted-foreground mb-8 animate-fade-in" style={{ animationDelay: "200ms" }}>
+                <p
+                  className="text-lg text-muted-foreground mb-8 animate-fade-in"
+                  style={{ animationDelay: "200ms" }}
+                >
                   We've received your request and will get back to you within 24
                   hours with a detailed quote and proposal.
                 </p>
-                <div className="space-y-3 text-left bg-muted/50 p-6 rounded-lg mb-8 animate-fade-in" style={{ animationDelay: "300ms" }}>
-                  <p className="font-semibold">Summary of your request:</p>
-                  <p className="text-sm">
-                    <span className="font-medium">Service:</span> {service.title}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Category:</span> {category.name}
-                  </p>
-                  {subcategory && (
-                    <p className="text-sm">
-                      <span className="font-medium">Type:</span> {subcategory.name}
-                    </p>
-                  )}
-                </div>
                 <Button
                   onClick={() => navigate("/")}
                   className="bg-gradient-hero hover:opacity-90 transition-all hover:scale-105 shadow-elegant animate-fade-in"
@@ -268,7 +273,81 @@ const InquiryForm = () => {
         </div>
       </div>
     );
-  }
+
+  const renderQuestion = (question) => {
+    switch (question.input_type) {
+      case "checkbox":
+        return question.options.map((opt) => (
+          <div key={opt.id} className="flex items-center space-x-3">
+            <Checkbox
+              id={opt.id}
+              checked={
+                Array.isArray(formData[question.id]) &&
+                formData[question.id].includes(opt.id)
+              }
+              onCheckedChange={(checked) => {
+                const current = formData[question.id] || [];
+                if (checked) {
+                  handleAnswerChange(question.id, [...current, opt.id]);
+                } else {
+                  handleAnswerChange(
+                    question.id,
+                    current.filter((o) => o !== opt.id)
+                  );
+                }
+              }}
+            />
+            <Label htmlFor={opt.id} className="cursor-pointer ">
+              {opt.option_label}
+            </Label>
+          </div>
+        ));
+      case "radio":
+        return (
+          <RadioGroup
+            value={formData[question.id]}
+            onValueChange={(value) => handleAnswerChange(question.id, value)}
+          >
+            {question.options.map((opt) => (
+              <div key={opt.id} className="flex items-center space-x-3">
+                <RadioGroupItem value={opt.id} id={opt.id} />
+                <Label htmlFor={opt.id} className="cursor-pointer">
+                  {opt.option_label}
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+        );
+      case "select":
+        return (
+          <Select
+            value={formData[question.id]}
+            onValueChange={(value) => handleAnswerChange(question.id, value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select an option" />
+            </SelectTrigger>
+            <SelectContent>
+              {question.options.map((opt) => (
+                <SelectItem key={opt.id} value={opt.id}>
+                  {opt.option_label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      case "text":
+      default:
+        return (
+          <Textarea
+            value={formData[question.id] || ""}
+            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+            placeholder="Type your answer here..."
+            rows={4}
+          />
+        );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -276,148 +355,168 @@ const InquiryForm = () => {
 
       <div className="pt-24 pb-20 px-4">
         <div className="container mx-auto max-w-3xl">
-          {/* Step Indicator */}
           <div className="mb-8 animate-fade-in">
-            <StepIndicator totalSteps={totalSteps} currentStep={currentStep} />
+            <StepIndicator
+              totalSteps={totalSteps}
+              currentStep={currentStepIndex }
+            />
           </div>
 
-          {/* Form Card */}
           <Card className="animate-scale-in shadow-elegant hover:shadow-hover transition-all duration-300">
             <CardHeader>
-              <div className="text-sm text-muted-foreground mb-2 animate-fade-in">
-                {service.title} → {category.name}
-                {subcategory && ` → ${subcategory.name}`}
-              </div>
-              <CardTitle className="text-2xl animate-fade-in" style={{ animationDelay: "100ms" }}>
-                {currentStep < questions.length
-                  ? `Question ${currentStep + 1}`
+              <CardTitle
+                className="text-2xl animate-fade-in"
+                style={{ animationDelay: "100ms" }}
+              >
+                {currentStep
+                  ? `Step ${currentStepIndex + 1}`
                   : "Contact Information"}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {currentStep < questions.length ? (
-                  // Question Step
-                  <div className="space-y-6 animate-fade-in" key={currentStep}>
-                    <div>
+              {!isContactStep ? (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    await submitCurrentStep();
+                  }}
+                  className="space-y-6"
+                >
+                  {currentStep.questions.length === 0 && (
+                    <p className="text-muted-foreground">
+                      No questions in this step.
+                    </p>
+                  )}
+                  {currentStep.questions.map((question) => (
+                    <div className="space-y-6" key={question.id}>
                       <Label className="text-lg font-medium mb-4 block">
-                        {questions[currentStep].question}
-                        {questions[currentStep].required && (
+                        {question.question_text}
+                        {question.is_required && (
                           <span className="text-destructive ml-1">*</span>
                         )}
                       </Label>
-                      {renderQuestion(questions[currentStep])}
+                      {renderQuestion(question)}
                     </div>
-                  </div>
-                ) : (
-                  // Contact Info Step
-                  <div className="space-y-4 animate-fade-in" key="contact">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">
-                        Full Name <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="name"
-                        value={formData.name || ""}
-                        onChange={(e) => {
-                          handleAnswerChange("name", e.target.value);
-                          if (errors.name) setErrors({ ...errors, name: "" });
-                        }}
-                        placeholder="John Doe"
-                        className={errors.name ? "border-destructive" : ""}
-                        required
-                      />
-                      {errors.name && (
-                        <p className="text-sm text-destructive animate-fade-in">{errors.name}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">
-                        Email Address <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email || ""}
-                        onChange={(e) => {
-                          handleAnswerChange("email", e.target.value);
-                          if (errors.email) setErrors({ ...errors, email: "" });
-                        }}
-                        placeholder="john@example.com"
-                        className={errors.email ? "border-destructive" : ""}
-                        required
-                      />
-                      {errors.email && (
-                        <p className="text-sm text-destructive animate-fade-in">{errors.email}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">
-                        Phone Number <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        value={formData.phone || ""}
-                        onChange={(e) => {
-                          handleAnswerChange("phone", e.target.value);
-                          if (errors.phone) setErrors({ ...errors, phone: "" });
-                        }}
-                        placeholder="+1 (555) 000-0000"
-                        className={errors.phone ? "border-destructive" : ""}
-                        required
-                      />
-                      {errors.phone && (
-                        <p className="text-sm text-destructive animate-fade-in">{errors.phone}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="company">Company Name</Label>
-                      <Input
-                        id="company"
-                        value={formData.company || ""}
-                        onChange={(e) => handleAnswerChange("company", e.target.value)}
-                        placeholder="Acme Inc."
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="additional">Additional Details</Label>
-                      <Textarea
-                        id="additional"
-                        value={formData.additional || ""}
-                        onChange={(e) =>
-                          handleAnswerChange("additional", e.target.value)
-                        }
-                        placeholder="Any additional information you'd like to share..."
-                        rows={4}
-                      />
-                    </div>
-                  </div>
-                )}
+                  ))}
 
-                {/* Navigation Buttons */}
-                <div className="flex justify-between pt-6 border-t animate-fade-in">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleBack}
-                    disabled={currentStep === 0}
-                    className="transition-all hover:scale-105"
-                  >
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back
-                  </Button>
-
-                  {currentStep < totalSteps - 1 ? (
+                  <div className="flex justify-between pt-6 border-t animate-fade-in">
                     <Button
                       type="button"
-                      onClick={handleNext}
+                      variant="outline"
+                      onClick={handleBack}
+                      disabled={currentStepIndex === 0}
+                      className="transition-all hover:scale-105"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back
+                    </Button>
+
+                    <Button
+                      type="submit"
                       className="bg-gradient-hero hover:opacity-90 transition-all hover:scale-105 shadow-elegant"
                     >
                       Next
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
-                  ) : (
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleContactSubmit} className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">
+                      Full Name <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="name"
+                      value={contactData.name}
+                      onChange={(e) =>
+                        handleContactChange("name", e.target.value)
+                      }
+                      placeholder="John Doe"
+                      required
+                      className={error ? "border-destructive" : ""}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="work_email">
+                      Email Address <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="work_email"
+                      type="email"
+                      value={contactData.work_email}
+                      onChange={(e) =>
+                        handleContactChange("work_email", e.target.value)
+                      }
+                      placeholder="john@example.com"
+                      required
+                      className={error ? "border-destructive" : ""}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="phone_number">
+                      Phone Number <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="phone_number"
+                      type="tel"
+                      value={contactData.phone_number}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      placeholder="1234567890"
+                      required
+                      className={phoneError ? "border-destructive" : ""}
+                    />
+                    {phoneError && (
+                      <p className="text-sm text-destructive">{phoneError}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="company_name">Company Name</Label>
+                    <Input
+                      id="company_name"
+                      value={contactData.company_name}
+                      onChange={(e) =>
+                        handleContactChange("company_name", e.target.value)
+                      }
+                      placeholder="Acme Inc."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="preferred_communication">
+                      Preferred Communication
+                    </Label>
+                    <Select
+                      value={contactData.preferred_communication}
+                      onValueChange={(val) =>
+                        handleContactChange("preferred_communication", val)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select communication method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="phone">Phone</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex justify-between pt-6 border-t animate-fade-in">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleBack}
+                      className="transition-all hover:scale-105"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back
+                    </Button>
+
                     <Button
                       type="submit"
                       className="bg-gradient-hero hover:opacity-90 transition-all hover:scale-105 shadow-elegant"
@@ -425,18 +524,17 @@ const InquiryForm = () => {
                       Submit Inquiry
                       <CheckCircle2 className="ml-2 h-4 w-4" />
                     </Button>
-                  )}
-                </div>
-              </form>
+                  </div>
+                </form>
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Footer */}
       <footer className="py-8 px-4 border-t border-border">
         <div className="container mx-auto text-center text-muted-foreground">
-          <p>&copy; 2024 Takkiwebsolution. All rights reserved.</p>
+          <p>&copy; 2025 Takkiwebsolution. All rights reserved.</p>
         </div>
       </footer>
     </div>

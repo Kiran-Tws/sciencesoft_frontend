@@ -211,7 +211,7 @@ const Home = () => {
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-border">
         <div className="container mx-auto text-center text-muted-foreground">
-          <p>&copy; 2024 Takkiwebsolution. All rights reserved.</p>
+          <p>&copy; 2025 Takkiwebsolution. All rights reserved.</p>
         </div>
       </footer>
     </div>
