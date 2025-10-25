@@ -100,7 +100,8 @@ const Pricing = () => {
                       category.subcategories.length > 0;
 
                     // Construct image URL with your prefix + category.icon from API
-                    const iconUrl = `${apiUrl}/uploads/${category.icon}`;
+                    // const iconUrl = `${apiUrl}/uploads/${category.icon}`;
+                     const CategoryIcon = getIcon(category.icon);
 
                     return (
                       <Link
@@ -120,12 +121,15 @@ const Pricing = () => {
                         <Card className="h-full group hover:shadow-hover transition-all duration-300 hover:-translate-y-1 border-border">
                           <CardHeader>
                            
-                            <div className="p-3 bg-gradient-hero rounded-lg w-fit mb-3 group-hover:scale-110 transition-transform">
+                            {/* <div className="p-3 bg-gradient-hero rounded-lg w-fit mb-3 group-hover:scale-110 transition-transform">
                               <img
                                 src={iconUrl}
                                 alt={`${category.name} icon`}
                                 className="h-8 w-8 object-contain"
                               />
+                            </div> */}
+                             <div className="p-3 bg-gradient-hero rounded-lg w-fit mb-3 group-hover:scale-110 transition-transform">
+                              <CategoryIcon className="h-8 w-8 text-primary-foreground" />
                             </div>
                             <CardTitle className="text-lg leading-tight">
                               {category.name}

@@ -101,7 +101,7 @@ const CategoryDetail = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {category.subcategories.map((subcategory, index) => {
                 // Construct image URL with your prefix + category.icon from API
-                const iconUrl = `${apiUrl}/uploads/${subcategory.icon}`;
+                const CategoryIcon = getIcon(subcategory.icon);
 
                 return (
                   <Link
@@ -113,11 +113,7 @@ const CategoryDetail = () => {
                     <Card className="h-full group hover:shadow-hover transition-all duration-300 hover:-translate-y-1 border-border">
                       <CardHeader>
                         <div className="p-3 bg-gradient-hero rounded-lg w-fit mb-3 group-hover:scale-110 transition-transform">
-                          <img
-                            src={iconUrl}
-                            alt={`${category.name} icon`}
-                            className="h-8 w-8 object-contain"
-                          />
+                          <CategoryIcon className="h-8 w-8 text-primary-foreground" />
                         </div>
                         <CardTitle className="text-lg">
                           {subcategory.name}
