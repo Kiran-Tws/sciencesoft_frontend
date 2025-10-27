@@ -134,11 +134,11 @@ const CategoryDetail = () => {
             <Card>
               <CardContent className="p-8 text-center">
                 <p className="text-muted-foreground mb-4">
-                  No subcategories available for this service.
+                  No subcategories available for this service yet.
                 </p>
-                <Link to={`/inquiry/${categoryId}`}>
+                <Link to={`/pricing`}>
                   <Button className="bg-gradient-hero">
-                    Proceed to Get Quote
+                     Back to Services
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>

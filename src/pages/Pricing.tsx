@@ -106,11 +106,12 @@ const Pricing = () => {
                     return (
                       <Link
                         key={category.id}
-                        to={
-                          hasSubcategories
-                            ? `/category/${category.id}`
-                            : `/inquiry/${category.id}`
-                        }
+                        to={`/category/${category.id}`}
+                        // {
+                        //   hasSubcategories
+                        //     ? `/category/${category.id}`
+                        //     : `/category/${category.id}`
+                        // }
                         className="block animate-scale-in"
                         style={{
                           animationDelay: `${
