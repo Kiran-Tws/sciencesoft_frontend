@@ -27,7 +27,7 @@ const Navbar = () => {
               <Code2 className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="bg-gradient-hero bg-clip-text text-transparent">
-              Takkiwebsolution
+              Tekkiwebsolutions
             </span>
           </Link>
 

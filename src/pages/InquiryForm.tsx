@@ -70,6 +70,7 @@ const InquiryForm = () => {
   const phoneRegex = /^\+?[\d\s\-().]{7,20}$/;
 
   const [phoneError, setPhoneError] = useState("");
+  const [commError, setCommError] = useState("");
 
   const handlePhoneChange = (value) => {
     // Allow empty string or only digits
@@ -195,6 +196,12 @@ const InquiryForm = () => {
 
     try {
       contactSchema.parse(contactData);
+      if (!contactData.preferred_communication) {
+        setCommError("Preferred communication method is required.");
+        return;
+      } else {
+        setCommError(""); // clear error if valid
+      }
 
       const contactDataResponse = await axios.post(
         `${apiUrl}/api/final-contacts/${sessionId}`,
@@ -279,13 +286,15 @@ const InquiryForm = () => {
       case "checkbox":
         return question.options.map((opt) => (
           <div key={opt.id} className="flex items-center space-x-3">
-            <Checkbox
+            <input
               id={opt.id}
+              type="checkbox"
               checked={
                 Array.isArray(formData[question.id]) &&
                 formData[question.id].includes(opt.id)
               }
-              onCheckedChange={(checked) => {
+              onChange={(e) => {
+                const checked = e.target.checked;
                 const current = formData[question.id] || [];
                 if (checked) {
                   handleAnswerChange(question.id, [...current, opt.id]);
@@ -296,12 +305,14 @@ const InquiryForm = () => {
                   );
                 }
               }}
+              className="h-5 w-5 border-2 border-primary  accent-primary focus:ring-2 focus:ring-primary transition-all cursor-pointer"
             />
             <Label htmlFor={opt.id} className="cursor-pointer ">
               {opt.option_label}
             </Label>
           </div>
         ));
+
       case "radio":
         return (
           <RadioGroup
@@ -358,7 +369,7 @@ const InquiryForm = () => {
           <div className="mb-8 animate-fade-in">
             <StepIndicator
               totalSteps={totalSteps}
-              currentStep={currentStepIndex }
+              currentStep={currentStepIndex}
             />
           </div>
 
@@ -487,13 +498,15 @@ const InquiryForm = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="preferred_communication">
-                      Preferred Communication
+                      Preferred Communication{" "}
+                      <span className="text-destructive">*</span>
                     </Label>
                     <Select
                       value={contactData.preferred_communication}
-                      onValueChange={(val) =>
-                        handleContactChange("preferred_communication", val)
-                      }
+                      onValueChange={(val) => {
+                        handleContactChange("preferred_communication", val);
+                        if (val) setCommError(""); // clear error on valid selection
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select communication method" />
@@ -504,6 +517,11 @@ const InquiryForm = () => {
                         <SelectItem value="none">None</SelectItem>
                       </SelectContent>
                     </Select>
+                    {commError && (
+                      <div className="text-destructive text-sm mt-1">
+                        {commError}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-between pt-6 border-t animate-fade-in">
