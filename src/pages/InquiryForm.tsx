@@ -73,14 +73,17 @@ const InquiryForm = () => {
   const [commError, setCommError] = useState("");
 
   const handlePhoneChange = (value) => {
-    // Allow empty string or only digits
-    if (value === "" || /^\d+$/.test(value)) {
-      handleContactChange("phone_number", value);
-      setPhoneError("");
-    } else {
-      setPhoneError("Please enter only numbers");
-    }
-  };
+  // Allow empty string or only digits up to length 14
+  if (value === "" || (/^\d+$/.test(value) && value.length <= 14)) {
+    handleContactChange("phone_number", value);
+    setPhoneError("");
+  } else if (!/^\d+$/.test(value)) {
+    setPhoneError("Please enter only numbers");
+  } else if (value.length > 14) {
+    setPhoneError("Phone number cannot exceed 14 digits");
+  }
+};
+
 
   console.log("subcategoryId->>", subcategoryId);
   useEffect(() => {
