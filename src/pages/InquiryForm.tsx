@@ -71,19 +71,43 @@ const InquiryForm = () => {
 
   const [phoneError, setPhoneError] = useState("");
   const [commError, setCommError] = useState("");
+  const [nameError, setNameError] = useState("");
+  const [companyError, setCompanyError] = useState("");
+
+  // Handlers:
+  const handleNameChange = (value) => {
+    if (!value.trim()) {
+      setNameError("Full Name is required");
+    } else if (!/^[A-Za-z\s]+$/.test(value)) {
+      setNameError("Name can contain only letters and spaces");
+    } else if (value.trim().length < 2) {
+      setNameError("Name must be at least 2 characters");
+    } else {
+      setNameError("");
+    }
+    handleContactChange("name", value);
+  };
+
+  const handleCompanyChange = (value) => {
+    if (value && !/^[A-Za-z0-9\s.,-]+$/.test(value)) {
+      setCompanyError("Company name contains invalid characters");
+    } else {
+      setCompanyError("");
+    }
+    handleContactChange("company_name", value);
+  };
 
   const handlePhoneChange = (value) => {
-  // Allow empty string or only digits up to length 14
-  if (value === "" || (/^\d+$/.test(value) && value.length <= 14)) {
-    handleContactChange("phone_number", value);
-    setPhoneError("");
-  } else if (!/^\d+$/.test(value)) {
-    setPhoneError("Please enter only numbers");
-  } else if (value.length > 14) {
-    setPhoneError("Phone number cannot exceed 14 digits");
-  }
-};
-
+    // Allow empty string or only digits up to length 14
+    if (value === "" || (/^\d+$/.test(value) && value.length <= 14)) {
+      handleContactChange("phone_number", value);
+      setPhoneError("");
+    } else if (!/^\d+$/.test(value)) {
+      setPhoneError("Please enter only numbers");
+    } else if (value.length > 14) {
+      setPhoneError("Phone number cannot exceed 14 digits");
+    }
+  };
 
   console.log("subcategoryId->>", subcategoryId);
   useEffect(() => {
@@ -195,50 +219,57 @@ const InquiryForm = () => {
   };
 
   const handleContactSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    try {
-      contactSchema.parse(contactData);
-      if (!contactData.preferred_communication) {
-        setCommError("Preferred communication method is required.");
-        return;
-      } else {
-        setCommError(""); // clear error if valid
-      }
+  // Prevent submission if company name has an error
+  if (companyError) {
+    toast.error("Please fix the company name field before submitting.");
+    return;
+  }
 
-      const contactDataResponse = await axios.post(
-        `${apiUrl}/api/final-contacts/${sessionId}`,
-        contactData
-      );
+  try {
+    contactSchema.parse(contactData);
 
-      if (contactDataResponse.status === 201) {
-        localStorage.removeItem("formSessionId");
-        setSubmitted(true);
-      } else {
-        // If backend responds with other than 201, show message if any
-        const msg =
-          contactDataResponse.data?.message ||
-          "Unexpected response from server. Please try again.";
-        toast.error(msg);
-      }
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        error.errors.forEach((err) => {
-          toast.error(err.message);
-        });
-      } else if (axios.isAxiosError(error)) {
-        // Axios error - try to extract backend error message
-        const backendMessage =
-          error.response?.data?.message ||
-          error.response?.data?.error ||
-          "Failed to submit contact info, please try again.";
-        toast.error(backendMessage);
-      } else {
-        console.error("Error submitting contact info:", error);
-        toast.error("Failed to submit contact info, please try again.");
-      }
+    if (!contactData.preferred_communication) {
+      setCommError("Preferred communication method is required.");
+      return;
+    } else {
+      setCommError(""); // clear error if valid
     }
-  };
+
+    const contactDataResponse = await axios.post(
+      `${apiUrl}/api/final-contacts/${sessionId}`,
+      contactData
+    );
+
+    if (contactDataResponse.status === 201) {
+      localStorage.removeItem("formSessionId");
+      setSubmitted(true);
+    } else {
+      // If backend responds with other than 201, show message if any
+      const msg =
+        contactDataResponse.data?.message ||
+        "Unexpected response from server. Please try again.";
+      toast.error(msg);
+    }
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      error.errors.forEach((err) => {
+        toast.error(err.message);
+      });
+    } else if (axios.isAxiosError(error)) {
+      const backendMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Failed to submit contact info, please try again.";
+      toast.error(backendMessage);
+    } else {
+      console.error("Error submitting contact info:", error);
+      toast.error("Failed to submit contact info, please try again.");
+    }
+  }
+};
+
 
   if (loading) return <p>Loading form...</p>;
   if (error) return <p className="text-red-600">{error}</p>;
@@ -443,13 +474,14 @@ const InquiryForm = () => {
                     <Input
                       id="name"
                       value={contactData.name}
-                      onChange={(e) =>
-                        handleContactChange("name", e.target.value)
-                      }
+                      onChange={(e) => handleNameChange(e.target.value)}
                       placeholder="John Doe"
                       required
-                      className={error ? "border-destructive" : ""}
+                      className={nameError ? "border-destructive" : ""}
                     />
+                    {nameError && (
+                      <p className="text-sm text-destructive">{nameError}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -486,17 +518,19 @@ const InquiryForm = () => {
                       <p className="text-sm text-destructive">{phoneError}</p>
                     )}
                   </div>
-
+                 
                   <div className="space-y-2">
                     <Label htmlFor="company_name">Company Name</Label>
                     <Input
                       id="company_name"
                       value={contactData.company_name}
-                      onChange={(e) =>
-                        handleContactChange("company_name", e.target.value)
-                      }
+                      onChange={(e) => handleCompanyChange(e.target.value)}
                       placeholder="Acme Inc."
+                      className={companyError ? "border-destructive" : ""}
                     />
+                    {companyError && (
+                      <p className="text-sm text-destructive">{companyError}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
