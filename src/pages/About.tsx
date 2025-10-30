@@ -8,7 +8,7 @@ const About = () => {
         <div className="container mx-auto max-w-4xl">
           <h1 className="text-4xl font-bold mb-6">About Us</h1>
           <p className="text-lg text-muted-foreground">
-            Learn more about Takkiwebsolution and our mission to deliver
+            Learn more about Tekkiwebsolutions and our mission to deliver
             innovative IT solutions.
           </p>
         </div>

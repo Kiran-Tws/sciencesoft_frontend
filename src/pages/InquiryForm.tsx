@@ -414,7 +414,7 @@ const InquiryForm = () => {
                 style={{ animationDelay: "100ms" }}
               >
                 {currentStep
-                  ? `Step ${currentStepIndex + 1}`
+                  ? ``
                   : "Contact Information"}
               </CardTitle>
             </CardHeader>
@@ -549,9 +549,9 @@ const InquiryForm = () => {
                         <SelectValue placeholder="Select communication method" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="none">Any</SelectItem>
                         <SelectItem value="email">Email</SelectItem>
                         <SelectItem value="phone">Phone</SelectItem>
-                        <SelectItem value="none">None</SelectItem>
                       </SelectContent>
                     </Select>
                     {commError && (
@@ -589,7 +589,7 @@ const InquiryForm = () => {
 
       <footer className="py-8 px-4 border-t border-border">
         <div className="container mx-auto text-center text-muted-foreground">
-          <p>&copy; 2025 Takkiwebsolution. All rights reserved.</p>
+          <p>&copy; 2025 Tekkiwebsolutions. All rights reserved.</p>
         </div>
       </footer>
     </div>

@@ -156,7 +156,7 @@ const Pricing = () => {
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-border">
         <div className="container mx-auto text-center text-muted-foreground">
-          <p>&copy; 2025 Takkiwebsolution. All rights reserved.</p>
+          <p>&copy; 2025 Tekkiwebsolutions. All rights reserved.</p>
         </div>
       </footer>
     </div>
